@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     // Success tokens
     LParen,
@@ -16,12 +16,7 @@ pub enum TokenKind {
     ParenOverflow,
 }
 
-#[derive(Debug, Clone)]
-pub struct ReplLoc {
-    pub col: Box<usize>,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Loc {
     FileLoc {
         path: Box<String>,
@@ -33,11 +28,12 @@ pub enum Loc {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub kind: Box<TokenKind>,
     pub text: Box<String>,
     pub loc: Box<Loc>,
+    pub paren_layer: Box<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +112,7 @@ impl Lexer {
                         kind: Box::new(TokenKind::LParen),
                         text: Box::new(c.to_string()),
                         loc: loc,
+                        paren_layer: self.paren_layer.clone(),
                     })
                 }
                 ')' => {
@@ -124,14 +121,17 @@ impl Lexer {
                             kind: Box::new(TokenKind::ParenOverflow),
                             text: Box::new(")".to_string()),
                             loc: loc,
+                            paren_layer: self.paren_layer.clone(),
                         })
                     } else {
-                        *self.paren_layer -= 1;
-                        Box::new(Token {
+                        let token = Box::new(Token {
                             kind: Box::new(TokenKind::RParen),
                             text: Box::new(c.to_string()),
                             loc: loc,
-                        })
+                            paren_layer: self.paren_layer.clone(),
+                        });
+                        *self.paren_layer -= 1;
+                        token
                     }
                 }
                 ':' => {
@@ -148,31 +148,37 @@ impl Lexer {
                             kind: Box::new(TokenKind::Rule),
                             text: Box::new(text),
                             loc: loc,
+                            paren_layer: self.paren_layer.clone(),
                         }),
                         ":apply" => Box::new(Token {
                             kind: Box::new(TokenKind::Apply),
                             text: Box::new(text),
                             loc: loc,
+                            paren_layer: self.paren_layer.clone(),
                         }),
                         ":quit" => Box::new(Token {
                             kind: Box::new(TokenKind::Quit),
                             text: Box::new(text),
                             loc: loc,
+                            paren_layer: self.paren_layer.clone(),
                         }),
                         ":load" => Box::new(Token {
                             kind: Box::new(TokenKind::Load),
                             text: Box::new(text),
                             loc: loc,
+                            paren_layer: self.paren_layer.clone(),
                         }),
                         ":save" => Box::new(Token {
                             kind: Box::new(TokenKind::Save),
                             text: Box::new(text),
                             loc: loc,
+                            paren_layer: self.paren_layer.clone(),
                         }),
                         _ => Box::new(Token {
                             kind: Box::new(TokenKind::String),
                             text: Box::new(text),
                             loc: loc,
+                            paren_layer: self.paren_layer.clone(),
                         }),
                     }
                 }
@@ -190,6 +196,7 @@ impl Lexer {
                         kind: Box::new(TokenKind::String),
                         text: Box::new(text),
                         loc: loc,
+                        paren_layer: self.paren_layer.clone(),
                     })
                 }
             },
@@ -200,25 +207,39 @@ impl Lexer {
                         kind: Box::new(TokenKind::End),
                         text: Box::new("".to_string()),
                         loc: loc,
+                        paren_layer: self.paren_layer.clone(),
                     })
                 } else {
                     Box::new(Token {
                         kind: Box::new(TokenKind::UnclosedParen),
                         text: Box::new("".to_string()),
                         loc: loc,
+                        paren_layer: self.paren_layer.clone(),
                     })
                 }
             }
         }
     }
 
-    pub fn peek(&mut self) -> &Box<Token> {
-        let token = self.next();
+    pub fn peek_token(&mut self) -> &Box<Token> {
+        let token = self.next_token();
         self.peeked.insert(token)
     }
 
-    pub fn next(&mut self) -> Box<Token> {
+    pub fn next_token(&mut self) -> Box<Token> {
         self.peeked.take().unwrap_or_else(|| self.lex())
+    }
+}
+
+impl Iterator for Lexer {
+    type Item = Box<Token>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.complete {
+            None
+        } else {
+            Some(self.next_token())
+        }
     }
 }
 

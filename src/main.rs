@@ -145,11 +145,37 @@ use std::io::{self, Write};
 
 fn main() {
     // let input = "(:rule demorgans (not (and p q)) (or (not p) (not q)))";
-    let input = "(:load test.wff)";
-    println!("Input: {}", input);
-    let mut lexer = Lexer::new(input, None);
-    while !lexer.complete {
-        let token = lexer.next();
-        println!("{:?}", token);
+    // let input = "(:load test.wff)";
+    // println!("Input: {}", input);
+    // let mut lexer = Lexer::new(input, None);
+    // while !lexer.complete {
+    //     let token = lexer.next();
+    //     println!("{:?}", token);
+    // }
+    // let input2 = ":quit";
+    // let mut lexer2 = Lexer::new(input2, None);
+    // let command = Command::parse(&mut lexer2);
+    // println!("First command: {:?}", command);
+    // let command2 = Command::parse(&mut lexer2);
+    // println!("Second command: {:?}", command2);
+    loop {
+        print!("RustyWFF> ");
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+
+        let mut lexer = Lexer::new(&input, None);
+        while let Some(command) = Command::parse(&mut lexer) {
+            match *command {
+                Command::QuitRepl => {
+                    println!("Exiting RustyWFF...");
+                    return;
+                },
+                _ => {
+                    println!("{:?}", command);
+                }
+            }
+        }
     }
 }

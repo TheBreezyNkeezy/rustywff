@@ -5,6 +5,7 @@ pub enum TokenKind {
     RParen,
     String,
     Rule,
+    Delete,
     Apply,
     Quit,
     Load,
@@ -28,13 +29,20 @@ pub enum Loc {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub struct Token {
     pub kind: Box<TokenKind>,
     pub text: Box<String>,
     pub loc: Box<Loc>,
-    pub paren_layer: Box<usize>,
 }
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.text == other.text
+    }
+}
+
+impl Eq for Token {} // Automatically derived based on PartialEq
 
 #[derive(Debug, Clone)]
 pub struct Lexer {
@@ -112,7 +120,6 @@ impl Lexer {
                         kind: Box::new(TokenKind::LParen),
                         text: Box::new(c.to_string()),
                         loc: loc,
-                        paren_layer: self.paren_layer.clone(),
                     })
                 }
                 ')' => {
@@ -121,14 +128,12 @@ impl Lexer {
                             kind: Box::new(TokenKind::ParenOverflow),
                             text: Box::new(")".to_string()),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
                         })
                     } else {
                         let token = Box::new(Token {
                             kind: Box::new(TokenKind::RParen),
                             text: Box::new(c.to_string()),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
                         });
                         *self.paren_layer -= 1;
                         token
@@ -148,37 +153,36 @@ impl Lexer {
                             kind: Box::new(TokenKind::Rule),
                             text: Box::new(text),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
+                        }),
+                        ":delete" => Box::new(Token {
+                            kind: Box::new(TokenKind::Delete),
+                            text: Box::new(text),
+                            loc: loc,
                         }),
                         ":apply" => Box::new(Token {
                             kind: Box::new(TokenKind::Apply),
                             text: Box::new(text),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
                         }),
                         ":quit" => Box::new(Token {
                             kind: Box::new(TokenKind::Quit),
                             text: Box::new(text),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
                         }),
                         ":load" => Box::new(Token {
                             kind: Box::new(TokenKind::Load),
                             text: Box::new(text),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
                         }),
                         ":save" => Box::new(Token {
                             kind: Box::new(TokenKind::Save),
                             text: Box::new(text),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
                         }),
                         _ => Box::new(Token {
                             kind: Box::new(TokenKind::String),
                             text: Box::new(text),
                             loc: loc,
-                            paren_layer: self.paren_layer.clone(),
                         }),
                     }
                 }
@@ -196,7 +200,6 @@ impl Lexer {
                         kind: Box::new(TokenKind::String),
                         text: Box::new(text),
                         loc: loc,
-                        paren_layer: self.paren_layer.clone(),
                     })
                 }
             },
@@ -207,14 +210,12 @@ impl Lexer {
                         kind: Box::new(TokenKind::End),
                         text: Box::new("".to_string()),
                         loc: loc,
-                        paren_layer: self.paren_layer.clone(),
                     })
                 } else {
                     Box::new(Token {
                         kind: Box::new(TokenKind::UnclosedParen),
                         text: Box::new("".to_string()),
                         loc: loc,
-                        paren_layer: self.paren_layer.clone(),
                     })
                 }
             }
@@ -242,147 +243,3 @@ impl Iterator for Lexer {
         }
     }
 }
-
-// #[derive(Debug, Clone, PartialEq)]
-// pub enum Token {
-//     LParen,
-//     RParen,
-//     String(Box<str>),
-//     Rule,           // Token for :rule command
-//     Apply,          // Token for :apply command
-//     Name(Box<str>), // Token for rule names or other names
-// }
-
-// fn extract_cons(input: &str) -> Option<(&str, &str)> {
-//     let input = input.trim(); // Trim any surrounding whitespace
-
-//     if input.starts_with('(') && input.ends_with(')') {
-//         let inner_content = &input[1..input.len() - 1]; // Extract the content inside the parentheses
-//         Some(("()", inner_content))
-//     } else {
-//         None // Return None if the input doesn't match the expected pattern
-//     }
-// }
-
-// fn extract_units(input: &str) -> Vec<Token> {
-//     let mut tokens = Vec::new();
-//     let mut chars = input.chars().peekable();
-//     let mut current_symbol = String::new();
-
-//     while let Some(c) = chars.next() {
-//         match c {
-//             '(' => {
-//                 if !current_symbol.is_empty() {
-//                     tokens.push(Token::String(current_symbol.clone().into_boxed_str()));
-//                     current_symbol.clear();
-//                 }
-//                 tokens.push(Token::LParen);
-//             }
-//             ')' => {
-//                 if !current_symbol.is_empty() {
-//                     tokens.push(Token::String(current_symbol.clone().into_boxed_str()));
-//                     current_symbol.clear();
-//                 }
-//                 tokens.push(Token::RParen);
-//             }
-//             ' ' => {
-//                 if !current_symbol.is_empty() {
-//                     tokens.push(Token::String(current_symbol.clone().into_boxed_str()));
-//                     current_symbol.clear();
-//                 }
-//             }
-//             _ if c.is_alphanumeric() || c == '-' => {
-//                 current_symbol.push(c);
-//             }
-//             _ => {}
-//         }
-//     }
-
-//     // Add any remaining symbol at the end of the input
-//     if !current_symbol.is_empty() {
-//         tokens.push(Token::String(current_symbol.into_boxed_str()));
-//     }
-
-//     tokens
-// }
-
-// fn extract_command(input: &str) -> (Vec<Token>, Vec<String>) {
-//     let mut tokens = Vec::new();
-//     let mut sub_expressions = Vec::new();
-//     let mut chars = input.chars().peekable();
-//     let mut depth = 0;
-//     let mut current_expr = String::new();
-//     let mut current_name = String::new();
-//     let mut found_name = false;
-
-//     // First, parse the command (e.g., ":rule" or ":apply") and the name.
-//     while let Some(c) = chars.next() {
-//         match c {
-//             ':' => {
-//                 let command: String = chars.by_ref().take_while(|&c| !c.is_whitespace()).collect();
-//                 match command.as_str() {
-//                     "rule" => tokens.push(Token::Rule),
-//                     "apply" => tokens.push(Token::Apply),
-//                     _ => println!("Unknown command: :{}", command),
-//                 }
-//             }
-//             _ if !found_name && c.is_alphanumeric() || c == '-' => {
-//                 current_name.push(c);
-//                 current_name.extend(
-//                     chars
-//                         .by_ref()
-//                         .take_while(|c| c.is_alphanumeric() || *c == '-'),
-//                 );
-//                 tokens.push(Token::Name(current_name.clone().into_boxed_str()));
-//                 found_name = true;
-//             }
-//             '(' => {
-//                 if depth == 0 {
-//                     current_expr.clear(); // Start a new S-expression
-//                 }
-//                 current_expr.push(c);
-//                 depth += 1;
-//             }
-//             ')' => {
-//                 current_expr.push(c);
-//                 depth -= 1;
-//                 if depth == 0 {
-//                     sub_expressions.push(current_expr.clone()); // Complete S-expression
-//                 }
-//             }
-//             _ => {
-//                 if depth > 0 {
-//                     current_expr.push(c);
-//                 }
-//             }
-//         }
-//     }
-
-//     (tokens, sub_expressions)
-// }
-
-// pub fn lexer(input: &str) -> Vec<Token> {
-//     let mut tokens = Vec::new();
-
-//     match extract_cons(input) {
-//         Some((_, content)) => {
-//             tokens.push(Token::LParen);
-//             tokens.extend(extract_units(content));
-//             tokens.push(Token::RParen);
-//         }
-//         None => match input {
-//             input if input.split_whitespace().count() == 1 => {
-//                 tokens.push(Token::String(input.into()));
-//             }
-//             _ => {
-//                 let (command_group, sub_expressions) = extract_command(input);
-//                 tokens.extend(command_group);
-//                 for sub_expression in sub_expressions {
-//                     tokens.extend(lexer(&sub_expression));
-//                 }
-//             }
-//         },
-//     }
-//     println!("{:?}", tokens);
-//     tokens
-// }
